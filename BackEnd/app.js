@@ -17,13 +17,14 @@ app.use(express.json());
 app.use(morgan('tiny'));
 app.use(bodyParser.json());
 app.use(errorHandler);
+app.use('/public/uploads', express.static(__dirname + '/public/uploads'));
 
 //route
 const productsRoutes = require('./routers/products');
 const ordersRoutes = require('./routers/orders');
 const usersRoutes = require('./routers/users');
 const categoriesRoutes = require('./routers/categories');
-const authJwt = require('./helpers/jwt');
+
 
 
 
