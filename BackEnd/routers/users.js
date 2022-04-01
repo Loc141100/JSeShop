@@ -118,7 +118,7 @@ router.delete(`/:id`, (req,res)=>{
         }
         else
         {
-            return res.status(404).json({success: false, message: "user not found"});
+            return res.status(404).json({success: false, message: "user id not found"});
         }
     }).catch(err =>{
         return res.status(400).json({success: false, error: err});

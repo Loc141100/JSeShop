@@ -3,6 +3,36 @@ const { default: mongoose } = require('mongoose');
 const {Category } = require('../model/category');
 const router = express.Router();
 const {Product}= require('../model/product');
+const multer = require('multer');
+
+const FILE_TYPE_MAP ={
+    'image/png': 'png',
+    'image/jpeg': 'jpeg',
+    'image/jpg': 'jpg'
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+
+        const rightFileTypye = FILE_TYPE_MAP[file.mimetype]; //kiem tra file type trong FILE_TYPE_MAP neu dung tra ve true
+        let wrongTypeError = new Error('Please input a png,jpeg or jpg file');
+
+        if (rightFileTypye)
+        {
+            wrongTypeError = null;
+        }
+
+      cb(wrongTypeError, 'public/uploads')
+    },
+    filename: function (req, file, cb) {
+      const fileName = file.originalname.replace(' ', '-');
+      const extension = FILE_TYPE_MAP[file.mimetype]
+      cb(null, `${fileName}-${Date.now()}.${extension}`);
+    }
+  })
+  
+const uploadOption = multer({ storage: storage })
+
 router.get(`/all`, async (req,res ) =>
     {
        const productList = await Product.find().populate('category');
@@ -44,7 +74,28 @@ router.get(`/:id`, async (req,res ) =>
 )
 
 
-router.put(`/:id`, async(req,res)=>{
+router.put(`/:id`,uploadOption.single('image'), async(req,res)=>{
+    if (!mongoose.isValidObjectId(req.params.id)){
+            return res.status(400).send('cant find the id of product');
+    }
+    const category = await Category.findById(req.body.category);
+    if (!category) return res.status(400).send('cant find the id of category');
+
+    const checkProduct = await Product.findById(req.params.id);
+    if (!checkProduct) return res.status('400').send('The product is not exist');
+
+    const file = req.file;
+    let imagePath;
+
+    if(file){
+        const fileName = file.filename;
+        const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+        imagePath = `${basePath}${fileName}`;
+    }else
+    {
+        imagePath = product.image;
+    }
+
     const product = await Product.findByIdAndUpdate(
         req.params.id,
         {
@@ -67,19 +118,60 @@ router.put(`/:id`, async(req,res)=>{
     res.send(product);
 })
 
-router.post(`/`,async (req,res ) =>
+
+//add more images in the product
+router.put(`/gallery-images/:id`,uploadOption.array('images',10), async (req,res) =>{
+
+    if (!mongoose.isValidObjectId(req.params.id)){
+        return res.status(400).send('cant find the id of product');
+    }
+
+
+    const fileimages = req.files;
+    let imagesPaths =[];
+    const category = await Category.findById(req.body.category);
+    const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+
+    if (!category) {
+        return res.status(400).send('cant find the id of category');
+    }
+
+
+    if (fileimages){
+        fileimages.map((file) =>{
+            imagesPaths.push(`${basePath}${file.fileName}`);
+        })
+    }
+ 
+    const product = await Product.findByIdAndUpdate(
+        req.params.id,
+        {
+            images: imagesPaths
+        },
+        {new : true}
+    )
+    if (!product)
+    return res.status(500).send('Cant find the id of Product');
+    res.send(product);
+});
+
+//post 1 product
+router.post(`/`,uploadOption.single('image'), async (req,res ) =>
     {
         // if(!mongoose.isValidObjectId(req.params.id))
         // return res.status(400).send('The Product not exist');
+        const fileImage = req.file; 
+        if(!fileImage) return res.status(400).send('You forgot to put main image');
         const category = await Category.findById(req.body.category);
         if(!category) return res.status(400).send('The Category not exist');
-        
-       const product = new Product(
+        const fileName = req.file.fieldname;
+        const basePath = `${req.protocol}://${req.get('host')}/public/uploads/`;
+       let product = new Product(
            {
                name : req.body.name,
                description: req.body.description,
                richDescription: req.body.richDescription,
-               image: req.body.image,
+               image: `${basePath}${fileName}`,
                brand: req.body.brand,
                price: req.body.price,
                category: req.body.category,
